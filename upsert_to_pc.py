@@ -57,45 +57,33 @@ def format_product(url):
     #     doll = json.load(json_file)
     doll = fetch_product_data(url)
 
+    vec = {
+        'id' : doll["product"]["asin"] + '-P',
+        'metadata' : {
+                'asin' : doll["product"]["asin"]
+            }
+    }
+
     if doll["product"].get("feature_bullets") is not None:
         features = " ".join(doll["product"]["feature_bullets"])
         response = client.embeddings.create(
             input="Title: " + doll["product"]["title"] + "\n" + "Description: " + features + "\n" + "Specifications: " + doll["product"]["specifications_flat"],
             model="text-embedding-ada-002"
         )
+        vec['values'] = response.data[0].embedding
+        vec['metadata']['text'] = "Title: " + doll["product"]["title"] + ", Description: " + features + ", Price: " + str(doll["product"]["buybox_winner"]["price"]["value"]) + ", Rating: " + str(doll["product"]["rating"]) + ", Specifications: " + doll["product"]["specifications_flat"]
 
-        vec = {
-            'id' : doll["product"]["asin"] + '-P',
-            'values' : response.data[0].embedding,
-            'metadata' : {
-                'asin' : doll["product"]["asin"],
-                'title' : doll["product"]["title"],
-                'description' : features,
-                'price' : doll["product"]["buybox_winner"]["price"]["value"],
-                'rating' : doll["product"]["rating"],
-                'specifications' : doll["product"]["specifications_flat"],
-                'summarization_attributes' : [att["name"] + ": " + str(att["value"]) + "/5.0" for att in doll["product"]["summarization_attributes"]]
-            }
-        }
     else:
         response = client.embeddings.create(
             input="Title: " + doll["product"]["title"] + "\n" + "Specifications: " + doll["product"]["specifications_flat"],
             model="text-embedding-ada-002"
         )
+        vec['values'] = response.data[0].embedding
+        vec["metadata"]['text'] = "Title: " + doll["product"]["title"] + ", Price: " + str(doll["product"]["buybox_winner"]["price"]["value"]) + ", Rating: " + str(doll["product"]["rating"]) + ", Specifications: " + doll["product"]["specifications_flat"]
+        
 
-        vec = {
-            'id' : doll["product"]["asin"] + '-P',
-            'values' : response.data[0].embedding,
-            'metadata' : {
-                'asin' : doll["product"]["asin"],
-                'title' : doll["product"]["title"],
-                'description' : "",
-                'price' : doll["product"]["buybox_winner"]["price"]["value"],
-                'rating' : doll["product"]["rating"],
-                'specifications' : doll["product"]["specifications_flat"],
-                'summarization_attributes' : [att["name"] + ": " + str(att["value"]) + "/5.0" for att in doll["product"]["summarization_attributes"]]
-            }
-        }
+    if doll["product"].get("summarization_attributes") is not None:
+        vec["product"]["text"] += "Attribute Summarization: " + ", ".join([att["name"] + ": " + str(att["value"]) + "/5.0" for att in doll["product"]["summarization_attributes"]])
     # pprint(vec)
     return vec
 
@@ -116,9 +104,7 @@ def format_reviews(url, asin):
             'values' : response.data[0].embedding,
             'metadata' : {
                 'asin' : asin,
-                'title' : v["title"],
-                'body' : v["body"],
-                'rating' : v["rating"],
+                'text' : "Title: " + v["title"] + ", Review Body: " + v["body"] + ", Rating: " + str(v["rating"]) + "/5"
             }
         }
 
@@ -147,8 +133,7 @@ def format_qa(asin):
                 'values' : response.data[0].embedding,
                 'metadata' : {
                     'asin' : doll["product"]["asin"],
-                    'question' : v["question"],
-                    'answer' : v["answer"],
+                    'text' : "Question: " + v["question"] + ", Answer: " + v["answer"]
                 }
             }
 
@@ -157,6 +142,7 @@ def format_qa(asin):
     # pprint(vectors)
     return vectors
 
+index = pinecone.Index("gptprime")
 def checkForAsin(asin):
     vectorx = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     value_to_check = asin
@@ -177,12 +163,18 @@ def main(data):
     #data = request.get_json()
     url = data.get('URL')
     asin = data.get("ASIN")
-    index = pinecone.Index("gptprime")
     if checkForAsin(asin=asin) is False:
         vectors = format_qa(asin)
         vectors.extend(format_reviews(url, asin))
         vectors.append(format_product(url))
 
-        index.upsert(vectors)
+        # index.upsert(vectors)
 
     return {}
+
+stuff = {
+    'URL': 'https://www.amazon.com/TORRAS-iPhone-15-Protection-Translucent/dp/B0CB5VCQWZ/?_encoding=UTF8&pd_rd_w=prMly&content-id=amzn1.sym.90e25839-c59e-4792-a597-79315d5273b3&pf_rd_p=90e25839-c59e-4792-a597-79315d5273b3&pf_rd_r=WPXNAMB5G91RB2P3E5QW&pd_rd_wg=Rt6J1&pd_rd_r=f4511a34-04af-4611-bc77-7860046780b4&ref_=pd_gw_dealz_cs&th=1',
+    'ASIN': 'B0CB5VCQWZ'
+}
+
+main(stuff)
