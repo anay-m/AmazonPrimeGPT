@@ -1,3 +1,3 @@
-These are just the files for the chrome extension. 
+These are just the files for the Chrome extension. 
 
-Update this to provide more information when you get the chance. 
+Notes: Still need to finish integrating the different APIs then returning the output
