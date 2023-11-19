@@ -15,6 +15,7 @@ function send_the_url_asin(url, asin) {
       .catch(error => console.error('API call error:', error));
   }
 
+
 // function send_the_asin(url) 
 // {
 //     //   // Example of an API call with the URL
